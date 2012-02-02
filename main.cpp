@@ -4,62 +4,6 @@
 #include <string>
 
 
-class Window
-{
-    HWND hwnd_;
-public:
-    Window()
-        : hwnd_(0)
-    {
-    }
-
-    void setHwnd(HWND hwnd)
-    {
-        hwnd_=hwnd;
-    }
-
-    void show()
-    {
-        ShowWindow(hwnd_, SW_SHOWNORMAL);
-        UpdateWindow(hwnd_);
-    }
-
-    LRESULT WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
-    {
-        switch(message)
-        {
-            case WM_PAINT:
-                {
-                    PAINTSTRUCT ps;
-                    HDC hdc = BeginPaint(hwnd, &ps);
-                    RECT rect;
-                    GetClientRect(hwnd, &rect);
-                    DrawText(hdc,
-                            "Hello Windows" ,
-                            -1, &rect,
-                            DT_SINGLELINE|DT_CENTER|DT_VCENTER);
-                    EndPaint(hwnd, &ps);
-                    return 0;
-                }
-
-            case WM_DESTROY:
-                PostQuitMessage(0);
-                return 0;
-
-            default:
-                return DefWindowProc(hwnd, message, wParam, lParam);
-        }
-    }
-
-    static LRESULT CALLBACK WndProcProxy(
-            HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
-    {
-        return ((Window*)GetWindowLongPtr(
-                hwnd, GWL_USERDATA))->WndProc(hwnd, message, wParam, lParam);
-    }
-};
-        
-
 class WindowsAPI
 {
 public:
@@ -67,13 +11,14 @@ public:
     {
     }
 
+    template<class WINDOW>
     bool register_class(const std::string &className)
     {
         WNDCLASSEX wndclass;
         ZeroMemory(&wndclass, sizeof(wndclass));
         wndclass.cbSize=sizeof(WNDCLASSEX);
         wndclass.style = CS_HREDRAW | CS_VREDRAW;
-        wndclass.lpfnWndProc = WindowsAPI::WndProc;
+        wndclass.lpfnWndProc = WindowsAPI::WndProc<WINDOW>;
         wndclass.cbClsExtra = 0;
         wndclass.cbWndExtra = 0;
         wndclass.hInstance = GetModuleHandle(NULL);
@@ -102,16 +47,17 @@ public:
                 window);
     }
 
+    template<class WINDOW>
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         switch(message)
         {
             case WM_CREATE:
                 {
-                    Window *window=(Window*)((LPCREATESTRUCT)lParam)->lpCreateParams;
+                    WINDOW *window=(WINDOW*)((LPCREATESTRUCT)lParam)->lpCreateParams;
                     SetWindowLongPtr(hwnd, GWL_USERDATA, (LONG_PTR)window);
-                    SetWindowLongPtr(hwnd, GWL_WNDPROC, (LONG_PTR)Window::WndProcProxy);
-                    return window->WndProc(hwnd, message, wParam, lParam);
+                    SetWindowLongPtr(hwnd, GWL_WNDPROC, (LONG_PTR)WINDOW::WndProc);
+                    return window->InstanceProc(hwnd, message, wParam, lParam);
                 }
 
             case WM_DESTROY:
@@ -136,6 +82,62 @@ public:
 };
 
 
+class Window
+{
+    HWND hwnd_;
+public:
+    Window()
+        : hwnd_(0)
+    {
+    }
+
+    void setHwnd(HWND hwnd)
+    {
+        hwnd_=hwnd;
+    }
+
+    void show()
+    {
+        ShowWindow(hwnd_, SW_SHOWNORMAL);
+        UpdateWindow(hwnd_);
+    }
+
+    LRESULT InstanceProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        switch(message)
+        {
+            case WM_PAINT:
+                {
+                    PAINTSTRUCT ps;
+                    HDC hdc = BeginPaint(hwnd, &ps);
+                    RECT rect;
+                    GetClientRect(hwnd, &rect);
+                    DrawText(hdc,
+                            "Hello Windows" ,
+                            -1, &rect,
+                            DT_SINGLELINE|DT_CENTER|DT_VCENTER);
+                    EndPaint(hwnd, &ps);
+                    return 0;
+                }
+
+            case WM_DESTROY:
+                PostQuitMessage(0);
+                return 0;
+
+            default:
+                return DefWindowProc(hwnd, message, wParam, lParam);
+        }
+    }
+
+    static LRESULT CALLBACK WndProc(
+            HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        return ((Window*)GetWindowLongPtr(
+                hwnd, GWL_USERDATA))->InstanceProc(hwnd, message, wParam, lParam);
+    }
+};
+        
+
 int WINAPI WinMain(
         HINSTANCE hInstance ,
         HINSTANCE hPrevInstance ,
@@ -145,7 +147,7 @@ int WINAPI WinMain(
     auto CLASS_NAME="HelloWindow";
 
     WindowsAPI api;
-    if(!api.register_class(CLASS_NAME)){
+    if(!api.register_class<Window>(CLASS_NAME)){
         return 1;
     }
     std::shared_ptr<Window> window(new Window);
