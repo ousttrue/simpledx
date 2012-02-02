@@ -7,12 +7,8 @@
 class WindowsAPI
 {
 public:
-    WindowsAPI()
-    {
-    }
-
     template<class WINDOW>
-    bool register_class(const std::string &className)
+    static bool register_class(const std::string &className)
     {
         WNDCLASSEX wndclass;
         ZeroMemory(&wndclass, sizeof(wndclass));
@@ -31,7 +27,7 @@ public:
     }
 
     template<class WINDOW>
-    HWND create(WINDOW *window, const std::string &title, const std::string &className)
+    static HWND create(WINDOW *window, const std::string &className, const std::string &title)
     {
         return CreateWindowEx(0,
                 className.c_str(),
@@ -68,7 +64,6 @@ public:
                 return DefWindowProc(hwnd, message, wParam, lParam);
         }
     }
-
 
     static int loop()
     {
@@ -138,24 +133,34 @@ public:
 };
         
 
+template<class WINDOW>
+WINDOW *registerAndCreate(const std::string &className, const std::string &title)
+{
+    if(!WindowsAPI::register_class<WINDOW>(className)){
+        return 0;
+    }
+    WINDOW *window=new WINDOW;
+    HWND hwnd=WindowsAPI::create(window, className, title);
+    if(!hwnd){
+        delete window;
+        return 0;
+    }
+    window->setHwnd(hwnd);
+    return window;
+}
+
+
 int WINAPI WinMain(
         HINSTANCE hInstance ,
         HINSTANCE hPrevInstance ,
         LPSTR lpCmdLine ,
         int nCmdShow ) {
 
-    auto CLASS_NAME="HelloWindow";
-
-    WindowsAPI api;
-    if(!api.register_class<Window>(CLASS_NAME)){
+    auto window=std::shared_ptr<Window>(
+            registerAndCreate<Window>("ClassName", "Hellow Window"));
+    if(!window){
         return 1;
     }
-    std::shared_ptr<Window> window(new Window);
-    HWND hwnd=api.create(window.get(), "Hello Window", CLASS_NAME);
-    if(!hwnd){
-        return 2;
-    }
-    window->setHwnd(hwnd);
     window->show();
     return WindowsAPI::loop();
 }
