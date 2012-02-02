@@ -134,16 +134,16 @@ public:
         
 
 template<class WINDOW>
-WINDOW *registerAndCreate(const std::string &className, const std::string &title)
+std::shared_ptr<WINDOW> registerAndCreate(
+        const std::string &className, const std::string &title)
 {
     if(!WindowsAPI::register_class<WINDOW>(className)){
-        return 0;
+        return std::shared_ptr<WINDOW>();
     }
-    WINDOW *window=new WINDOW;
-    HWND hwnd=WindowsAPI::create(window, className, title);
+    auto window=std::shared_ptr<WINDOW>(new WINDOW);
+    HWND hwnd=WindowsAPI::create(window.get(), className, title);
     if(!hwnd){
-        delete window;
-        return 0;
+        return std::shared_ptr<WINDOW>();
     }
     window->setHwnd(hwnd);
     return window;
@@ -156,8 +156,7 @@ int WINAPI WinMain(
         LPSTR lpCmdLine ,
         int nCmdShow ) {
 
-    auto window=std::shared_ptr<Window>(
-            registerAndCreate<Window>("ClassName", "Hellow Window"));
+    auto window=registerAndCreate<Window>("ClassName", "Hellow Window");
     if(!window){
         return 1;
     }
