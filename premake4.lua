@@ -71,9 +71,11 @@ files {
 defines {
 }
 includedirs {
+    'C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Include',
 }
 libdirs {
 }
 links {
+    'd3d10',
 }
 
