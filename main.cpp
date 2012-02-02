@@ -60,10 +60,10 @@ public:
 };
         
 
-class WindowFactory
+class WindowsAPI
 {
 public:
-    WindowFactory()
+    WindowsAPI()
     {
     }
 
@@ -73,7 +73,7 @@ public:
         ZeroMemory(&wndclass, sizeof(wndclass));
         wndclass.cbSize=sizeof(WNDCLASSEX);
         wndclass.style = CS_HREDRAW | CS_VREDRAW;
-        wndclass.lpfnWndProc = WindowFactory::WndProc;
+        wndclass.lpfnWndProc = WindowsAPI::WndProc;
         wndclass.cbClsExtra = 0;
         wndclass.cbWndExtra = 0;
         wndclass.hInstance = GetModuleHandle(NULL);
@@ -144,17 +144,17 @@ int WINAPI WinMain(
 
     auto CLASS_NAME="HelloWindow";
 
-    WindowFactory factory;
-    if(!factory.register_class(CLASS_NAME)){
+    WindowsAPI api;
+    if(!api.register_class(CLASS_NAME)){
         return 1;
     }
     std::shared_ptr<Window> window(new Window);
-    HWND hwnd=factory.create(window.get(), "Hello Window", CLASS_NAME);
+    HWND hwnd=api.create(window.get(), "Hello Window", CLASS_NAME);
     if(!hwnd){
         return 2;
     }
     window->setHwnd(hwnd);
     window->show();
-    return WindowFactory::loop();
+    return WindowsAPI::loop();
 }
 
