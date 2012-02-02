@@ -8,25 +8,6 @@ class WindowsAPI
 {
 public:
     template<class WINDOW>
-    static bool register_class(const std::string &className)
-    {
-        WNDCLASSEX wndclass;
-        ZeroMemory(&wndclass, sizeof(wndclass));
-        wndclass.cbSize=sizeof(WNDCLASSEX);
-        wndclass.style = CS_HREDRAW | CS_VREDRAW;
-        wndclass.lpfnWndProc = WindowsAPI::WndProc<WINDOW>;
-        wndclass.cbClsExtra = 0;
-        wndclass.cbWndExtra = 0;
-        wndclass.hInstance = GetModuleHandle(NULL);
-        wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-        wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
-        wndclass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
-        wndclass.lpszMenuName = NULL;
-        wndclass.lpszClassName = className.c_str();
-        return RegisterClassEx(&wndclass)!=0;
-    }
-
-    template<class WINDOW>
     static HWND create(WINDOW *window, const std::string &className, const std::string &title)
     {
         return CreateWindowEx(0,
@@ -75,6 +56,26 @@ public:
         return msg.wParam;
     }
 };
+
+
+template<class WINDOW>
+bool register_class(const std::string &className)
+{
+    WNDCLASSEX wndclass;
+    ZeroMemory(&wndclass, sizeof(wndclass));
+    wndclass.cbSize=sizeof(WNDCLASSEX);
+    wndclass.style = CS_HREDRAW | CS_VREDRAW;
+    wndclass.lpfnWndProc = WindowsAPI::WndProc<WINDOW>;
+    wndclass.cbClsExtra = 0;
+    wndclass.cbWndExtra = 0;
+    wndclass.hInstance = GetModuleHandle(NULL);
+    wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wndclass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+    wndclass.lpszMenuName = NULL;
+    wndclass.lpszClassName = className.c_str();
+    return RegisterClassEx(&wndclass)!=0;
+}
 
 
 class Window
@@ -137,7 +138,7 @@ template<class WINDOW>
 std::shared_ptr<WINDOW> registerAndCreate(
         const std::string &className, const std::string &title)
 {
-    if(!WindowsAPI::register_class<WINDOW>(className)){
+    if(!register_class<WINDOW>(className)){
         return std::shared_ptr<WINDOW>();
     }
     auto window=std::shared_ptr<WINDOW>(new WINDOW);
