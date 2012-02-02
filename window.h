@@ -158,6 +158,14 @@ public:
     {
     }
 
+    ~DirectX()
+    {
+        if( pd3dDevice_ ) pd3dDevice_->ClearState();
+        if( pRenderTargetView_ ) pRenderTargetView_->Release();
+        if( pSwapChain_ ) pSwapChain_->Release();
+        if( pd3dDevice_ ) pd3dDevice_->Release();
+    }
+
     void setHwnd(HWND hwnd)
     {
         hwnd_=hwnd;
