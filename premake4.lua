@@ -74,8 +74,9 @@ includedirs {
     'C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Include',
 }
 libdirs {
+    'C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Lib/x86',
 }
 links {
-    'd3d10',
+    'd3dx10', 'd3d10', 
 }
 

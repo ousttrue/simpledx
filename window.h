@@ -139,6 +139,12 @@ public:
 
 #include <d3d10.h>
 #include <d3dx10.h>
+struct SimpleVertex
+{
+        D3DXVECTOR3 Pos;
+};
+
+
 class DirectX
 {
     HWND hwnd_;
@@ -148,19 +154,33 @@ class DirectX
     IDXGISwapChain*         pSwapChain_;
     ID3D10RenderTargetView* pRenderTargetView_;
 
+    ID3D10Effect*           pEffect_;
+    ID3D10EffectTechnique*  pTechnique_;
+    ID3D10InputLayout*      pVertexLayout_;
+    ID3D10Buffer*           pVertexBuffer_;
 public:
     DirectX()
         : hwnd_(0), initialized_(false),
         driverType_(D3D10_DRIVER_TYPE_NULL),
         pd3dDevice_(NULL),
         pSwapChain_(NULL),
-        pRenderTargetView_(NULL)
+        pRenderTargetView_(NULL),
+
+        pEffect_(NULL),
+        pTechnique_(NULL),
+        pVertexLayout_(NULL),
+        pVertexBuffer_(NULL)
     {
     }
 
     ~DirectX()
     {
         if( pd3dDevice_ ) pd3dDevice_->ClearState();
+
+        if( pVertexBuffer_ ) pVertexBuffer_->Release();
+        if( pVertexLayout_ ) pVertexLayout_->Release();
+        if( pEffect_ ) pEffect_->Release();
+
         if( pRenderTargetView_ ) pRenderTargetView_->Release();
         if( pSwapChain_ ) pSwapChain_->Release();
         if( pd3dDevice_ ) pd3dDevice_->Release();
@@ -184,7 +204,7 @@ public:
             case WM_PAINT:
                 {
                     if(!initialized_){
-                        if(InitDevice(hwnd)==S_OK){
+                        if(InitDevice()==S_OK){
                             initialized_=true;
                         }
                     }
@@ -214,12 +234,12 @@ public:
                     hwnd, GWL_USERDATA))->InstanceProc(hwnd, message, wParam, lParam);
     }
 
-    HRESULT InitDevice(HWND hwnd)
+    HRESULT InitDevice()
     {
-        HRESULT hr = S_OK;;
+        HRESULT hr = S_OK;
 
         RECT rc;
-        GetClientRect( hwnd, &rc );
+        GetClientRect( hwnd_, &rc );
         UINT width = rc.right - rc.left;
         UINT height = rc.bottom - rc.top;
 
@@ -244,7 +264,7 @@ public:
         sd.BufferDesc.RefreshRate.Numerator = 60;
         sd.BufferDesc.RefreshRate.Denominator = 1;
         sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        sd.OutputWindow = hwnd;
+        sd.OutputWindow = hwnd_;
         sd.SampleDesc.Count = 1;
         sd.SampleDesc.Quality = 0;
         sd.Windowed = TRUE;
@@ -261,13 +281,13 @@ public:
             return hr;
 
         // Create a render target view
-        ID3D10Texture2D* pBackBuffer;
-        hr = pSwapChain_->GetBuffer( 0, __uuidof( ID3D10Texture2D ), ( LPVOID* )&pBackBuffer );
+        ID3D10Texture2D* pBuffer;
+        hr = pSwapChain_->GetBuffer( 0, __uuidof( ID3D10Texture2D ), ( LPVOID* )&pBuffer );
         if( FAILED( hr ) )
             return hr;
 
-        hr = pd3dDevice_->CreateRenderTargetView( pBackBuffer, NULL, &pRenderTargetView_ );
-        pBackBuffer->Release();
+        hr = pd3dDevice_->CreateRenderTargetView( pBuffer, NULL, &pRenderTargetView_ );
+        pBuffer->Release();
         if( FAILED( hr ) )
             return hr;
 
@@ -283,9 +303,77 @@ public:
         vp.TopLeftY = 0;
         pd3dDevice_->RSSetViewports( 1, &vp );
 
+        // Create the effect
+        DWORD dwShaderFlags = D3D10_SHADER_ENABLE_STRICTNESS;
+#if defined( DEBUG ) || defined( _DEBUG )
+        // Set the D3D10_SHADER_DEBUG flag to embed debug information in the shaders.
+        // Setting this flag improves the shader debugging experience, but still allows 
+        // the shaders to be optimized and to run exactly the way they will run in 
+        // the release configuration of this program.
+        dwShaderFlags |= D3D10_SHADER_DEBUG;
+#endif
+        hr = D3DX10CreateEffectFromFile( "Tutorial02.fx", NULL, NULL, "fx_4_0", dwShaderFlags, 0,
+                pd3dDevice_, NULL, NULL, &pEffect_, NULL, NULL );
+        if( FAILED( hr ) )
+        {
+            MessageBox( NULL,
+                    "The FX file cannot be located.  Please run this executable from the directory that contains the FX file.", "Error", MB_OK );
+            return hr;
+        }
+
+        // Obtain the technique
+        pTechnique_ = pEffect_->GetTechniqueByName( "Render" );
+
+        // Define the input layout
+        D3D10_INPUT_ELEMENT_DESC layout[] =
+        {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+        };
+        UINT numElements = sizeof( layout ) / sizeof( layout[0] );
+
+        // Create the input layout
+        D3D10_PASS_DESC PassDesc;
+        pTechnique_->GetPassByIndex( 0 )->GetDesc( &PassDesc );
+        hr = pd3dDevice_->CreateInputLayout( layout, numElements, PassDesc.pIAInputSignature,
+                PassDesc.IAInputSignatureSize, &pVertexLayout_ );
+        if( FAILED( hr ) )
+            return hr;
+
+        // Set the input layout
+        pd3dDevice_->IASetInputLayout( pVertexLayout_ );
+
+        // Create vertex buffer
+        SimpleVertex vertices[] =
+        {
+            D3DXVECTOR3( 0.0f, 0.5f, 0.5f ),
+            D3DXVECTOR3( 0.5f, -0.5f, 0.5f ),
+            D3DXVECTOR3( -0.5f, -0.5f, 0.5f ),
+        };
+        D3D10_BUFFER_DESC bd;
+        bd.Usage = D3D10_USAGE_DEFAULT;
+        bd.ByteWidth = sizeof( SimpleVertex ) * 3;
+        bd.BindFlags = D3D10_BIND_VERTEX_BUFFER;
+        bd.CPUAccessFlags = 0;
+        bd.MiscFlags = 0;
+        D3D10_SUBRESOURCE_DATA InitData;
+        InitData.pSysMem = vertices;
+        hr = pd3dDevice_->CreateBuffer( &bd, &InitData, &pVertexBuffer_ );
+        if( FAILED( hr ) )
+            return hr;
+
+        // Set vertex buffer
+        UINT stride = sizeof( SimpleVertex );
+        UINT offset = 0;
+        pd3dDevice_->IASetVertexBuffers( 0, 1, &pVertexBuffer_, &stride, &offset );
+
+        // Set primitive topology
+        pd3dDevice_->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+
         return S_OK;
     }
 
+    /*
+    // Tutorial01
     void Render()
     {
         // Just clear the backbuffer
@@ -293,6 +381,28 @@ public:
         pd3dDevice_->ClearRenderTargetView( pRenderTargetView_, ClearColor );
         pSwapChain_->Present( 0, 0 );
     }
+    */
+
+    void Render()
+    {
+        // Clear the back buffer 
+        float ClearColor[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red,green,blue,alpha
+        pd3dDevice_->ClearRenderTargetView( pRenderTargetView_, ClearColor );
+
+        // Render a triangle
+        D3D10_TECHNIQUE_DESC techDesc;
+        pTechnique_->GetDesc( &techDesc );
+        for( UINT p = 0; p < techDesc.Passes; ++p )
+        {
+            pTechnique_->GetPassByIndex( p )->Apply( 0 );
+            pd3dDevice_->Draw( 3, 0 );
+        }
+
+        // Present the information rendered to the back buffer to the front buffer 
+        // (the screen)
+        pSwapChain_->Present( 0, 0 );
+    }
+
 };
 
 
